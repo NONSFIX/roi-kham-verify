@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Roi-Kham — ตรวจสอบคำ</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#0f0e17; --surf:#1a1825; --surf2:#222133; --border:#2e2c42;
+  --gold:#d4a84b; --gold-dim:#8a6b2a; --text:#e8e4d9; --dim:#7a7690;
+  --green:#4caf7d; --red:#e05c5c; --yellow:#f0c060;
+}
+body {
+  font-family:'Noto Sans Thai','Thonburi','Tahoma',sans-serif;
+  background:var(--bg); color:var(--text); height:100vh; overflow:hidden;
+  font-size:14px; user-select:none; -webkit-user-select:none;
+}
+
+/* Header */
+header {
+  height:50px; background:linear-gradient(135deg,#1a1825,#0f0e17);
+  border-bottom:1px solid var(--gold-dim); display:flex; align-items:center;
+  padding:0 12px; gap:8px; flex-shrink:0;
+}
+header h1 { font-family:'Cinzel',serif; font-size:.95rem; color:var(--gold); letter-spacing:2px; flex-shrink:0; }
+#modeSelectorBtn {
+  display:flex; align-items:center; gap:5px; background:var(--surf2);
+  border:1px solid var(--border); border-radius:6px; padding:4px 9px;
+  cursor:pointer; font-family:inherit; color:var(--text); font-size:12px;
+  flex-shrink:0; transition:border-color 150ms;
+}
+#modeSelectorBtn:hover { border-color:var(--gold-dim); }
+#modeSelectorBtn .arrow { color:var(--dim); font-size:10px; }
+.score-wrap { position:relative; display:flex; align-items:center; gap:5px; flex-shrink:0; margin-left:auto; }
+#scoreEl  { font-size:13px; color:var(--gold); font-weight:600; }
+#streakEl { font-size:11px; color:var(--yellow); min-width:26px; }
+.score-flash {
+  position:absolute; top:-18px; left:50%; transform:translateX(-50%);
+  font-size:12px; font-weight:700; color:var(--green); pointer-events:none;
+  opacity:0; white-space:nowrap;
+}
+.score-flash.pop { animation:popUp 600ms ease forwards; }
+@keyframes popUp { 0%{opacity:1;transform:translateX(-50%) translateY(0);} 100%{opacity:0;transform:translateX(-50%) translateY(-22px);} }
+.icon-btn {
+  font-size:15px; background:transparent; border:1px solid var(--border);
+  border-radius:6px; padding:4px 7px; cursor:pointer; flex-shrink:0; line-height:1;
+}
+.icon-btn:hover { background:var(--surf2); }
+
+.layout { display:flex; flex-direction:column; height:calc(100vh - 50px); }
+
+/* Progress */
+.progress-wrap {
+  display:flex; align-items:center; gap:10px; padding:5px 14px;
+  background:var(--surf2); border-bottom:1px solid var(--border); flex-shrink:0;
+}
+.progress-bar { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+#progressFill { height:100%; background:var(--gold); border-radius:2px; width:0%; transition:width 500ms ease; }
+#progressText { font-size:10px; color:var(--dim); white-space:nowrap; }
+
+/* Arena + cards */
+#arena { flex:1; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+.card {
+  position:absolute; width:min(320px,88vw); background:var(--surf);
+  border:1px solid var(--border); border-radius:20px; box-shadow:0 8px 32px rgba(0,0,0,.5);
+  display:flex; flex-direction:column; align-items:center; padding:32px 22px 24px;
+  gap:12px; overflow:hidden; will-change:transform;
+}
+.card-next { z-index:1; transform:scale(.95) translateY(14px); pointer-events:none; transition:transform 300ms ease; }
+.card-active { z-index:2; cursor:grab; touch-action:none; }
+.card-active:active { cursor:grabbing; }
+.overlay { position:absolute; inset:0; border-radius:20px; opacity:0; pointer-events:none; }
+.overlay-right { background:rgba(76,175,125,.35); }
+.overlay-left  { background:rgba(224,92,92,.35); }
+.overlay-up    { background:rgba(240,192,96,.22); }
+.overlay-label { position:absolute; font-size:1.3rem; font-weight:700; opacity:0; pointer-events:none; border-radius:8px; padding:4px 14px; border:2.5px solid; }
+.label-right { top:22px; left:18px; color:var(--green); border-color:var(--green); transform:rotate(-15deg); }
+.label-left  { top:22px; right:18px; color:var(--red); border-color:var(--red); transform:rotate(15deg); }
+.label-up    { bottom:22px; left:50%; transform:translateX(-50%); color:var(--yellow); border-color:var(--yellow); }
+.card-word-wrap { position:relative; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.card-word { font-size:3rem; font-weight:700; color:var(--text); letter-spacing:2px; text-align:center; line-height:1.25; }
+.syl-dots { display:flex; gap:4px; }
+.syl-dot { width:5px; height:5px; border-radius:50%; background:var(--border); }
+.syl-dot.filled { background:var(--gold-dim); }
+.card-divider { width:56px; height:1px; background:var(--border); }
+.card-field-label { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:var(--dim); }
+.card-classification { font-size:1.4rem; font-weight:600; color:var(--gold); text-align:center; }
+.card-sub { font-size:11px; color:var(--dim); }
+.cat-tags { display:flex; flex-wrap:wrap; gap:5px; justify-content:center; margin-top:2px; }
+.cat-tag { font-size:10px; padding:2px 9px; border-radius:99px; background:var(--surf2); border:1px solid var(--border); color:var(--dim); }
+.cat-tags-verify { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+.cat-tag-verify { font-size:13px; padding:5px 13px; border-radius:99px; background:rgba(212,168,75,.10); border:1px solid var(--gold-dim); color:var(--gold); font-weight:600; }
+.cat-tag-empty { font-size:1.1rem; color:var(--dim); font-style:italic; }
+
+.exit-right { transform:translateX(130vw) rotate(30deg)!important; opacity:0!important; transition:transform 320ms ease-in,opacity 320ms ease-in!important; }
+.exit-left  { transform:translateX(-130vw) rotate(-30deg)!important; opacity:0!important; transition:transform 320ms ease-in,opacity 320ms ease-in!important; }
+.exit-up    { transform:translateY(-130vh)!important; opacity:0!important; transition:transform 320ms ease-in,opacity 320ms ease-in!important; }
+.snap-back  { transition:transform 220ms cubic-bezier(.34,1.56,.64,1)!important; }
+
+#emptyState, #loadingState {
+  display:none; flex-direction:column; align-items:center; gap:14px;
+  color:var(--dim); text-align:center; padding:24px;
+}
+#emptyState.visible, #loadingState.visible { display:flex; }
+.empty-icon { font-size:3rem; }
+#emptyState h2 { color:var(--gold); font-size:1.1rem; font-weight:600; }
+#emptyState p { font-size:13px; line-height:1.6; }
+.spinner { width:34px; height:34px; border:3px solid var(--border); border-top-color:var(--gold); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+.hint-row { display:flex; justify-content:center; gap:36px; padding:9px 0 13px; flex-shrink:0; border-top:1px solid var(--border); background:var(--surf); }
+.hint { font-size:11px; }
+.hint-wrong { color:var(--red); } .hint-right { color:var(--green); } .hint-skip { color:var(--yellow); }
+
+/* Sheets */
+#backdrop { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:10; opacity:0; pointer-events:none; transition:opacity 280ms; }
+#backdrop.visible { opacity:1; pointer-events:auto; }
+.sheet {
+  position:fixed; bottom:0; left:0; right:0; background:var(--surf);
+  border-top:1px solid var(--border); border-radius:20px 20px 0 0;
+  padding:12px 20px 32px; transform:translateY(100%);
+  transition:transform 280ms cubic-bezier(.4,0,.2,1); max-height:85vh; overflow-y:auto; z-index:12;
+}
+.sheet.visible { transform:translateY(0); }
+.sheet-handle { width:40px; height:4px; background:var(--border); border-radius:2px; margin:0 auto 18px; }
+.sheet-title { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:var(--dim); text-align:center; margin-bottom:14px; }
+.sheet-wrong-word { font-size:1.7rem; font-weight:700; color:var(--text); text-align:center; margin-bottom:4px; }
+.sheet-wrong-current { font-size:12px; color:var(--red); text-align:center; margin-bottom:18px; }
+.sheet-cancel { width:100%; padding:10px; font-size:13px; font-family:inherit; background:transparent; border:1px solid var(--border); border-radius:10px; color:var(--dim); cursor:pointer; }
+.sheet-cancel:hover { background:var(--surf2); }
+.option-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px; }
+.option-btn { padding:13px 8px; font-size:14px; font-family:inherit; background:var(--surf2); border:1px solid var(--border); border-radius:10px; color:var(--text); cursor:pointer; text-align:center; transition:background 120ms,border-color 120ms; line-height:1.3; }
+.option-btn:hover { background:var(--border); border-color:var(--gold-dim); }
+.option-btn.current-val { border-color:var(--red); color:var(--dim); }
+.cat-chip-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:14px; }
+.cat-chip { padding:10px 8px; font-size:13px; font-family:inherit; background:var(--surf2); border:1px solid var(--border); border-radius:10px; color:var(--dim); cursor:pointer; text-align:center; transition:background 120ms,border-color 120ms,color 120ms; }
+.cat-chip.selected { background:rgba(212,168,75,.12); border-color:var(--gold); color:var(--gold); }
+.confirm-btn { width:100%; padding:12px; font-size:14px; font-family:inherit; background:var(--gold-dim); border:none; border-radius:10px; color:var(--text); cursor:pointer; margin-bottom:8px; font-weight:600; transition:background 120ms; }
+.confirm-btn:hover { background:var(--gold); color:#0f0e17; }
+.mode-card { display:flex; align-items:center; gap:14px; width:100%; padding:14px 16px; margin-bottom:8px; background:var(--surf2); border:1px solid var(--border); border-radius:14px; cursor:pointer; font-family:inherit; text-align:left; transition:border-color 150ms,background 150ms; }
+.mode-card:hover { border-color:var(--gold-dim); background:var(--border); }
+.mode-card.current { border-color:var(--gold); }
+.mode-card-icon { font-size:1.6rem; flex-shrink:0; }
+.mode-card-info { flex:1; }
+.mode-card-name { font-size:15px; font-weight:600; color:var(--text); }
+.mode-card-sub { font-size:11px; color:var(--dim); margin-top:2px; }
+.mode-card-progress { font-size:11px; color:var(--gold-dim); text-align:right; flex-shrink:0; white-space:nowrap; }
+
+/* Leaderboard */
+.lb-row { display:flex; align-items:center; gap:12px; padding:10px 6px; border-bottom:1px solid var(--border); }
+.lb-rank { font-size:14px; font-weight:700; color:var(--gold); width:26px; text-align:center; flex-shrink:0; }
+.lb-name { flex:1; font-size:14px; color:var(--text); }
+.lb-name.me { color:var(--gold); }
+.lb-score { font-size:13px; color:var(--gold); font-weight:600; }
+.lb-total { font-size:10px; color:var(--dim); }
+
+/* Nickname modal */
+#nickModal { position:fixed; inset:0; z-index:20; background:rgba(15,14,23,.92); display:none; flex-direction:column; align-items:center; justify-content:center; padding:24px; gap:18px; }
+#nickModal.visible { display:flex; }
+#nickModal .logo { font-family:'Cinzel',serif; font-size:1.6rem; color:var(--gold); letter-spacing:3px; }
+#nickModal .tagline { font-size:13px; color:var(--dim); text-align:center; line-height:1.6; max-width:300px; }
+#nickInput { width:min(300px,80vw); padding:14px 16px; font-size:16px; font-family:inherit; background:var(--surf); border:1px solid var(--border); border-radius:12px; color:var(--text); text-align:center; }
+#nickInput:focus { outline:none; border-color:var(--gold); }
+#nickStart { width:min(300px,80vw); padding:14px; font-size:15px; font-weight:600; font-family:inherit; background:var(--gold-dim); border:none; border-radius:12px; color:var(--text); cursor:pointer; transition:background 120ms; }
+#nickStart:hover { background:var(--gold); color:#0f0e17; }
+
+/* toast */
+#toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--surf2); border:1px solid var(--border); color:var(--text); padding:10px 16px; border-radius:10px; font-size:12px; opacity:0; pointer-events:none; transition:opacity 200ms,transform 200ms; z-index:30; }
+#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+#config-error { position:fixed; inset:0; z-index:40; background:var(--bg); color:var(--text); display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:30px; text-align:center; }
+#config-error.visible { display:flex; }
+#config-error code { background:var(--surf2); padding:2px 8px; border-radius:5px; color:var(--gold); font-size:13px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ROI-KHAM</h1>
+  <button id="modeSelectorBtn" onclick="openModePicker()">
+    <span id="modeLabel">ชนิดคำ</span><span class="arrow">▾</span>
+  </button>
+  <div class="score-wrap">
+    <span id="scoreEl">⭐ 0</span>
+    <span id="streakEl"></span>
+    <span class="score-flash" id="scoreFlash"></span>
+  </div>
+  <button class="icon-btn" onclick="openLeaderboard()" title="อันดับ">🏆</button>
+</header>
+
+<div class="layout">
+  <div class="progress-wrap">
+    <div class="progress-bar"><div id="progressFill"></div></div>
+    <span id="progressText">— / —</span>
+  </div>
+
+  <div id="arena">
+    <div id="loadingState"><div class="spinner"></div><p>กำลังโหลดคำ...</p></div>
+    <div id="emptyState">
+      <div class="empty-icon">🎉</div>
+      <h2>ตรวจสอบครบแล้ว!</h2>
+      <p>คำในโหมดนี้ได้รับการตรวจครบทุกคำแล้ว<br>ลองสลับไปโหมดอื่นดูสิ</p>
+    </div>
+  </div>
+
+  <div class="hint-row">
+    <span class="hint hint-wrong">← ผิด</span>
+    <span class="hint hint-skip">↑ ข้าม</span>
+    <span class="hint hint-right">→ ถูก</span>
+  </div>
+</div>
+
+<div id="backdrop" onclick="handleBackdropClick()"></div>
+
+<div class="sheet" id="modePicker">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">เลือกโหมดการตรวจสอบ</div>
+  <div id="modeCards"></div>
+</div>
+
+<div class="sheet" id="correctionSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-wrong-word" id="sheetWord"></div>
+  <div class="sheet-wrong-current" id="sheetCurrent"></div>
+  <div class="sheet-title">เลือกคำตอบที่ถูกต้อง</div>
+  <div class="option-grid" id="optionGrid"></div>
+  <button class="sheet-cancel" onclick="dismissSheet()">ยกเลิก — ข้ามคำนี้</button>
+</div>
+
+<div class="sheet" id="catSelectSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-wrong-word" id="catSheetWord"></div>
+  <div class="sheet-title" style="margin-top:8px">เลือกหมวดหมู่ที่ถูกต้อง (เลือกได้หลายหมวด)</div>
+  <div class="cat-chip-grid" id="catChipGrid"></div>
+  <button class="confirm-btn" onclick="confirmCatSelection()">ยืนยันการแก้ไข</button>
+  <button class="sheet-cancel" onclick="dismissSheet()">ยกเลิก — ข้ามคำนี้</button>
+</div>
+
+<div class="sheet" id="leaderboardSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">🏆 อันดับผู้เล่น</div>
+  <div id="lbList"></div>
+</div>
+
+<div id="nickModal">
+  <div class="logo">ROI-KHAM</div>
+  <div class="tagline">ช่วยกันตรวจสอบคำภาษาไทย<br>ปัดขวา = ถูก · ปัดซ้าย = ผิด · ปัดขึ้น = ข้าม</div>
+  <input id="nickInput" maxlength="20" placeholder="ใส่ชื่อเล่นของคุณ" autocomplete="off">
+  <button id="nickStart">เริ่มเล่น</button>
+</div>
+
+<div id="toast"></div>
+<div id="config-error">
+  <h2 style="color:var(--gold)">⚙️ ยังไม่ได้ตั้งค่า Supabase</h2>
+  <p>เปิดไฟล์ <code>index.html</code> แล้วใส่ค่า<br><code>SUPABASE_URL</code> และ <code>SUPABASE_ANON_KEY</code><br>ในส่วน CONFIG ด้านบนของ &lt;script&gt;</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+'use strict';
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  CONFIG — paste your Supabase project values here             ║
+   ║  Dashboard → Project Settings → API                           ║
+   ║  (the ANON / public key is safe to expose in the browser)     ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+const SUPABASE_URL      = 'PASTE_YOUR_SUPABASE_URL_HERE';      // e.g. https://abcd.supabase.co
+const SUPABASE_ANON_KEY = 'PASTE_YOUR_SUPABASE_ANON_KEY_HERE';
+/* ────────────────────────────────────────────────────────────── */
+
+const BUFFER_SIZE = 25;   // words fetched per request
+const REFILL_AT   = 8;    // refetch when queue drops to this
+const VOTES_NEEDED = 3;   // keep in sync with schema.sql
+
+/* ── Data maps ── */
+const POS_MAP = [
+  {th:'คำนาม',db:'NOUN'},{th:'คำกริยา',db:'VERB'},{th:'คำวิเศษณ์',db:'ADJ'},
+  {th:'คำกริยาวิเศษณ์',db:'ADV'},{th:'คำสรรพนาม',db:'PRON'},{th:'คำสันธาน',db:'CONJ'},
+  {th:'คำอุทาน',db:'INTJ'},{th:'คำบุพบท',db:'PREP'},{th:'คำลักษณนาม',db:'CLAS'},
+  {th:'คำนิบาต',db:'PART'},{th:'คำปฏิเสธ',db:'NEG'},{th:'อื่นๆ',db:''},
+];
+const FINAL_MAP = [
+  {th:'แม่กก',db:'กก'},{th:'แม่กด',db:'กด'},{th:'แม่กบ',db:'กบ'},{th:'แม่กง',db:'กง'},
+  {th:'แม่กน',db:'กน'},{th:'แม่กม',db:'กม'},{th:'แม่เกย',db:'เกย'},{th:'แม่เกอว',db:'เกอว'},
+  {th:'แม่ก กา (ไม่มีตัวสะกด)',db:'none'},
+];
+const LIVEDEAD_MAP = [{th:'เป็น (Live)',db:'live'},{th:'ตาย (Dead)',db:'dead'}];
+const LEAD_MAP = [{th:'อักษรกลาง',db:'mid'},{th:'อักษรต่ำ',db:'low'},{th:'อักษรสูง',db:'high'}];
+const CAT_MAP = {
+  animal:'สัตว์',plant:'พืช',food:'อาหาร',drink:'เครื่องดื่ม',fruit:'ผลไม้',vegetable:'ผัก',
+  vehicle:'ยานพาหนะ',house_item:'ของใช้ในบ้าน',body_part:'อวัยวะ',family:'ครอบครัว',
+  color:'สี',shape:'รูปทรง',nature:'ธรรมชาติ',weather:'สภาพอากาศ',sport:'กีฬา',hobby:'งานอดิเรก',
+};
+const CAT_ARRAY = Object.entries(CAT_MAP).map(([db,th])=>({db,th}));
+
+const MODES = [
+  {id:'pos',     th:'ชนิดคำ',       sub:'POS · 12 ประเภท',    icon:'📝', field:'pos',           prop:'pos',           multi:false, map:POS_MAP},
+  {id:'final',   th:'มาตราตัวสะกด', sub:'8 มาตรา + กา',       icon:'🔤', field:'final_class',   prop:'final_class',   multi:false, map:FINAL_MAP},
+  {id:'livedead',th:'เสียงคำ',      sub:'เป็น / ตาย',          icon:'🔊', field:'live_dead',     prop:'live_dead',     multi:false, map:LIVEDEAD_MAP},
+  {id:'lead',    th:'อักษร 3 หมู่', sub:'กลาง / ต่ำ / สูง',   icon:'🎯', field:'leading_class', prop:'leading_class', multi:false, map:LEAD_MAP},
+  {id:'cats',    th:'หมวดหมู่คำ',   sub:'Semantic · 16 หมวด',  icon:'🏷️', field:'categories',    prop:'categories',    multi:true,  map:CAT_ARRAY},
+];
+
+/* ── State ── */
+let sb = null;
+let modeId = 'pos';
+let queue = [];           // array of word objects from server
+let currentWord = null;
+let activeCard = null;
+let openSheet = null;
+let pendingWord = null;
+let catSelection = new Set();
+let fetching = false;
+let nickname = '';
+let deviceId = '';
+
+let sessionScore = 0, streak = 0, sinceStatRefresh = 0;
+let pendingInserts = [];
+
+const SWIPE_THRESHOLD = 75, ROT_MAX = 15;
+let dragging=false, startX=0, startY=0, dx=0, dy=0;
+
+/* ── Helpers ── */
+function modeObj(){ return MODES.find(m=>m.id===modeId); }
+function getVal(w){ return (w && w[modeObj().prop]) || ''; }
+function el(tag,cls,text){ const d=document.createElement(tag); d.className=cls; if(text!==undefined) d.textContent=text; return d; }
+function getLabel(dbVal){
+  const m=modeObj();
+  if(m.multi){ if(!dbVal) return '(ไม่มีหมวดหมู่)'; return dbVal.split(',').filter(Boolean).map(c=>CAT_MAP[c]||c).join(', '); }
+  return (m.map.find(x=>x.db===dbVal)||{th:dbVal||'—'}).th;
+}
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ── Boot ── */
+document.addEventListener('DOMContentLoaded', () => {
+  if (!SUPABASE_URL.startsWith('http') || SUPABASE_ANON_KEY.length < 20) {
+    document.getElementById('config-error').classList.add('visible');
+    return;
+  }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  deviceId = localStorage.getItem('roi_device');
+  if (!deviceId) { deviceId = (crypto.randomUUID && crypto.randomUUID()) || ('d'+Date.now()+Math.random()); localStorage.setItem('roi_device', deviceId); }
+  try { pendingInserts = JSON.parse(localStorage.getItem('roi_pending')||'[]'); } catch(_){ pendingInserts=[]; }
+
+  nickname = localStorage.getItem('roi_nick') || '';
+  if (nickname) startGame();
+  else showNickModal();
+
+  document.getElementById('nickStart').addEventListener('click', submitNick);
+  document.getElementById('nickInput').addEventListener('keydown', e=>{ if(e.key==='Enter') submitNick(); });
+});
+
+function showNickModal(){ document.getElementById('nickModal').classList.add('visible'); setTimeout(()=>document.getElementById('nickInput').focus(),100); }
+function submitNick(){
+  const v=document.getElementById('nickInput').value.trim();
+  if(!v){ document.getElementById('nickInput').focus(); return; }
+  nickname=v; localStorage.setItem('roi_nick', v);
+  document.getElementById('nickModal').classList.remove('visible');
+  startGame();
+}
+
+async function startGame(){
+  flushPending();
+  buildModeCards();
+  setLoading(true);
+  await refill(true);
+  setLoading(false);
+  renderCards();
+  updateHeader();
+  refreshStats();
+}
+
+function setLoading(on){ document.getElementById('loadingState').classList.toggle('visible', on); }
+
+/* ── Fetch words from Supabase (least-voted first) ── */
+async function refill(reset){
+  if (fetching) return;
+  fetching = true;
+  try {
+    const { data, error } = await sb.rpc('get_words', { p_field: modeObj().field, p_count: BUFFER_SIZE });
+    if (error) throw error;
+    const have = new Set(queue.map(w=>w.word));
+    const fresh = (data||[]).filter(w=>!have.has(w.word));
+    if (reset) queue = fresh; else queue.push(...fresh);
+  } catch(e){
+    console.error(e);
+    toast('โหลดคำไม่สำเร็จ — ตรวจการเชื่อมต่อ');
+  } finally {
+    fetching = false;
+  }
+}
+
+/* ── Rendering ── */
+function renderCards(){
+  const arena=document.getElementById('arena');
+  arena.querySelectorAll('.card').forEach(c=>c.remove());
+  if(queue.length===0){
+    document.getElementById('emptyState').classList.add('visible');
+    activeCard=null; currentWord=null; return;
+  }
+  document.getElementById('emptyState').classList.remove('visible');
+  currentWord=queue[0];
+  if(queue.length>1) arena.appendChild(createCard(queue[1],true));
+  const card=createCard(queue[0],false);
+  arena.appendChild(card); activeCard=card; attachDrag(card);
+}
+
+function createCard(w, isNext){
+  const m=modeObj();
+  const dbVal=getVal(w);
+  const sylCnt=w.syllables||1;
+  const cats=w.categories?w.categories.split(',').filter(Boolean):[];
+  const card=document.createElement('div');
+  card.className='card '+(isNext?'card-next':'card-active');
+  if(!isNext){
+    [['overlay-right','ov-r'],['overlay-left','ov-l'],['overlay-up','ov-u']].forEach(([cls,id])=>{ const d=el('div','overlay '+cls); d.id=id; card.appendChild(d); });
+    [['label-right','✓ ถูก'],['label-left','✗ ผิด'],['label-up','↑ ข้าม']].forEach(([cls,txt])=>card.appendChild(el('div','overlay-label '+cls,txt)));
+  }
+  const wrap=el('div','card-word-wrap');
+  wrap.appendChild(el('div','card-word',w.word));
+  if(sylCnt>1){ const dots=el('div','syl-dots'); for(let i=0;i<Math.min(sylCnt,6);i++) dots.appendChild(el('span','syl-dot filled')); wrap.appendChild(dots); }
+  card.appendChild(wrap);
+  card.appendChild(el('div','card-divider'));
+  card.appendChild(el('div','card-field-label',m.th));
+  if(m.id==='cats'){
+    if(cats.length){ const t=el('div','cat-tags-verify'); cats.forEach(c=>t.appendChild(el('span','cat-tag-verify',CAT_MAP[c]||c))); card.appendChild(t); }
+    else card.appendChild(el('div','cat-tag-empty','(ไม่มีหมวดหมู่)'));
+  } else {
+    card.appendChild(el('div','card-classification',getLabel(dbVal)||'—'));
+    if(dbVal && dbVal!==getLabel(dbVal)) card.appendChild(el('div','card-sub',dbVal));
+    if(cats.length){ const t=el('div','cat-tags'); cats.slice(0,5).forEach(c=>t.appendChild(el('span','cat-tag',CAT_MAP[c]||c))); card.appendChild(t); }
+  }
+  return card;
+}
+
+/* ── Drag ── */
+function attachDrag(card){ card.addEventListener('pointerdown', onDown); }
+function onDown(e){ if(openSheet||!activeCard) return; dragging=true; startX=e.clientX; startY=e.clientY; dx=0; dy=0; activeCard.setPointerCapture(e.pointerId); activeCard.addEventListener('pointermove',onMove); activeCard.addEventListener('pointerup',onUp); activeCard.addEventListener('pointercancel',onCancel); }
+function onMove(e){
+  if(!dragging) return;
+  dx=e.clientX-startX; dy=e.clientY-startY;
+  activeCard.style.transform=`translate(${dx}px,${dy}px) rotate(${(dx/window.innerWidth)*ROT_MAX*2}deg)`;
+  const rP=Math.min(1,Math.max(0,dx)/SWIPE_THRESHOLD), lP=Math.min(1,Math.max(0,-dx)/SWIPE_THRESHOLD), uP=Math.min(1,Math.max(0,-dy)/SWIPE_THRESHOLD);
+  const r=document.getElementById('ov-r'),l=document.getElementById('ov-l'),u=document.getElementById('ov-u');
+  if(r)r.style.opacity=rP; if(l)l.style.opacity=lP; if(u)u.style.opacity=uP*.85;
+  activeCard.querySelectorAll('.overlay-label').forEach(d=>{
+    if(d.classList.contains('label-right'))d.style.opacity=Math.min(1,rP*1.6);
+    else if(d.classList.contains('label-left'))d.style.opacity=Math.min(1,lP*1.6);
+    else if(d.classList.contains('label-up'))d.style.opacity=Math.min(1,uP*1.6);
+  });
+}
+function onUp(){ if(!dragging) return; dragging=false; cleanupDrag(); const ax=Math.abs(dx),ay=Math.abs(dy); if(ax>SWIPE_THRESHOLD&&ax>=ay)doSwipe(dx>0?'right':'left'); else if(-dy>SWIPE_THRESHOLD&&ay>ax)doSwipe('up'); else snapBack(); }
+function onCancel(){ dragging=false; cleanupDrag(); snapBack(); }
+function cleanupDrag(){ if(!activeCard)return; activeCard.removeEventListener('pointermove',onMove); activeCard.removeEventListener('pointerup',onUp); activeCard.removeEventListener('pointercancel',onCancel); }
+function snapBack(){ if(!activeCard)return; activeCard.classList.add('snap-back'); activeCard.style.transform=''; activeCard.querySelectorAll('.overlay,.overlay-label').forEach(d=>d.style.opacity='0'); activeCard.addEventListener('transitionend',()=>activeCard&&activeCard.classList.remove('snap-back'),{once:true}); }
+
+/* ── Swipe actions ── */
+function doSwipe(dir){
+  if(!activeCard||!currentWord) return;
+  if(dir==='right'){ saveVerification(currentWord,'correct',null); flyOut('right'); setTimeout(advance,320); }
+  else if(dir==='up'){ resetStreak(); flyOut('up'); queue.push(queue.shift()); setTimeout(renderCards,320); }
+  else { snapBack(); pendingWord=currentWord; modeObj().multi?showCatSelectSheet():showCorrectionSheet(); }
+}
+function flyOut(dir){ if(!activeCard)return; const n=document.getElementById('arena').querySelector('.card-next'); if(n)n.style.transform='scale(1) translateY(0)'; activeCard.classList.add('exit-'+dir); }
+function advance(){ queue.shift(); renderCards(); updateHeader(); if(queue.length<=REFILL_AT) refill(false).then(()=>{ if(!currentWord) renderCards(); }); }
+
+/* ── Correction sheet (single) ── */
+function showCorrectionSheet(){
+  const w=pendingWord, dbVal=getVal(w);
+  document.getElementById('sheetWord').textContent=w.word;
+  document.getElementById('sheetCurrent').textContent=`ค่าปัจจุบัน: ${getLabel(dbVal)}  (${dbVal||'ว่าง'})`;
+  const grid=document.getElementById('optionGrid'); grid.innerHTML='';
+  for(const opt of modeObj().map){ const b=document.createElement('button'); b.className='option-btn'+(opt.db===dbVal?' current-val':''); b.textContent=opt.th; b.onclick=()=>selectCorrection(opt.db); grid.appendChild(b); }
+  showSheet('correctionSheet','correction');
+}
+function selectCorrection(db){ const w=pendingWord; hideAllSheets(); saveVerification(w,'wrong',db); flyOut('left'); setTimeout(advance,320); }
+
+/* ── Category sheet (multi) ── */
+function showCatSelectSheet(){
+  const w=pendingWord; const curr=w.categories||'';
+  catSelection=new Set(curr.split(',').filter(Boolean));
+  document.getElementById('catSheetWord').textContent=w.word;
+  const grid=document.getElementById('catChipGrid'); grid.innerHTML='';
+  for(const opt of CAT_ARRAY){ const b=document.createElement('button'); b.className='cat-chip'+(catSelection.has(opt.db)?' selected':''); b.textContent=opt.th; b.onclick=()=>{ catSelection.has(opt.db)?catSelection.delete(opt.db):catSelection.add(opt.db); b.classList.toggle('selected',catSelection.has(opt.db)); }; grid.appendChild(b); }
+  showSheet('catSelectSheet','catSelect');
+}
+function confirmCatSelection(){ const w=pendingWord; const corr=[...catSelection].sort().join(','); hideAllSheets(); saveVerification(w,'wrong',corr); flyOut('left'); setTimeout(advance,320); }
+
+/* ── Mode picker ── */
+function buildModeCards(){
+  const c=document.getElementById('modeCards'); c.innerHTML='';
+  for(const m of MODES){
+    const b=document.createElement('button');
+    b.className='mode-card'+(m.id===modeId?' current':'');
+    b.innerHTML=`<span class="mode-card-icon">${m.icon}</span><span class="mode-card-info"><span class="mode-card-name">${m.th}</span><span class="mode-card-sub">${m.sub}</span></span><span class="mode-card-progress" id="mc-${m.id}">—</span>`;
+    b.onclick=()=>selectMode(m.id); c.appendChild(b);
+  }
+}
+function openModePicker(){ buildModeCards(); loadModeProgress(); showSheet('modePicker','mode'); }
+async function loadModeProgress(){
+  for(const m of MODES){
+    try{ const {data}=await sb.rpc('field_stats',{p_field:m.field}); if(data&&data[0]){ const {done,total}=data[0]; const pct=total?(done/total*100).toFixed(1):'0.0'; const e=document.getElementById('mc-'+m.id); if(e) e.innerHTML=`${Number(done).toLocaleString()}<br>(${pct}%)`; } }catch(_){}
+  }
+}
+async function selectMode(id){
+  hideAllSheets();
+  if(id===modeId) return;
+  modeId=id; queue=[]; currentWord=null;
+  setLoading(true); await refill(true); setLoading(false);
+  renderCards(); updateHeader(); refreshStats();
+}
+
+/* ── Leaderboard ── */
+async function openLeaderboard(){
+  const list=document.getElementById('lbList');
+  list.innerHTML='<p style="text-align:center;color:var(--dim);padding:20px">กำลังโหลด...</p>';
+  showSheet('leaderboardSheet','leaderboard');
+  try{
+    const {data,error}=await sb.rpc('leaderboard',{p_limit:15});
+    if(error) throw error;
+    if(!data||!data.length){ list.innerHTML='<p style="text-align:center;color:var(--dim);padding:20px">ยังไม่มีผู้เล่น</p>'; return; }
+    list.innerHTML='';
+    data.forEach((row,i)=>{
+      const r=el('div','lb-row');
+      r.appendChild(el('span','lb-rank', i===0?'🥇':i===1?'🥈':i===2?'🥉':String(i+1)));
+      const nm=el('span','lb-name'+(row.nickname===nickname?' me':''), row.nickname);
+      r.appendChild(nm);
+      const sc=el('div',''); sc.appendChild(el('div','lb-score','⭐ '+Number(row.score).toLocaleString())); sc.appendChild(el('div','lb-total',Number(row.total).toLocaleString()+' คำ')); sc.style.textAlign='right';
+      r.appendChild(sc); list.appendChild(r);
+    });
+  }catch(e){ console.error(e); list.innerHTML='<p style="text-align:center;color:var(--red);padding:20px">โหลดอันดับไม่สำเร็จ</p>'; }
+}
+
+/* ── Sheet management ── */
+function showSheet(id,name){ document.getElementById('backdrop').classList.add('visible'); document.getElementById(id).classList.add('visible'); openSheet=name; }
+function hideAllSheets(){ document.getElementById('backdrop').classList.remove('visible'); ['modePicker','correctionSheet','catSelectSheet','leaderboardSheet'].forEach(id=>document.getElementById(id).classList.remove('visible')); openSheet=null; pendingWord=null; }
+function dismissSheet(){ hideAllSheets(); snapBack(); }
+function handleBackdropClick(){ if(openSheet==='mode'||openSheet==='leaderboard') hideAllSheets(); else dismissSheet(); }
+
+/* ── Score ── */
+function addScore(type){
+  const earned=(type==='correction'?20:10)+Math.floor(streak/5)*2;
+  sessionScore+=earned; streak++;
+  document.getElementById('scoreEl').textContent=`⭐ ${sessionScore.toLocaleString()}`;
+  document.getElementById('streakEl').textContent=streak>=3?`🔥${streak}`:'';
+  const f=document.getElementById('scoreFlash'); f.textContent=`+${earned}`; f.classList.remove('pop'); void f.offsetWidth; f.classList.add('pop');
+}
+function resetStreak(){ streak=0; document.getElementById('streakEl').textContent=''; }
+
+/* ── Stats / header ── */
+function updateHeader(){ const m=modeObj(); document.getElementById('modeLabel').textContent=`${m.icon} ${m.th}`; }
+async function refreshStats(){
+  try{
+    const {data}=await sb.rpc('field_stats',{p_field:modeObj().field});
+    if(data&&data[0]){ const {done,total}=data[0]; const pct=total?(done/total*100).toFixed(2):'0.00';
+      document.getElementById('progressFill').style.width=pct+'%';
+      document.getElementById('progressText').textContent=`${Number(done).toLocaleString()} / ${Number(total).toLocaleString()} (${pct}%)`;
+    }
+  }catch(_){}
+}
+
+/* ── Persistence (send votes to Supabase) ── */
+function saveVerification(w, vote, correction){
+  const m=modeObj();
+  const rec={ word:w.word, field:m.field, vote, current_val:getVal(w), correction, nickname, device_id:deviceId };
+  sendVerification(rec);
+  addScore(vote==='wrong'?'correction':'confirm');
+  if(++sinceStatRefresh>=10){ sinceStatRefresh=0; refreshStats(); }
+}
+async function sendVerification(rec){
+  try{ const {error}=await sb.from('verifications').insert(rec); if(error) throw error; }
+  catch(e){ console.warn('insert failed, queued', e); pendingInserts.push(rec); localStorage.setItem('roi_pending', JSON.stringify(pendingInserts)); }
+}
+async function flushPending(){
+  if(!pendingInserts.length) return;
+  const batch=pendingInserts.splice(0); localStorage.setItem('roi_pending','[]');
+  try{ const {error}=await sb.from('verifications').insert(batch); if(error) throw error; toast(`ส่งคะแนนที่ค้างไว้ ${batch.length} รายการแล้ว`); }
+  catch(e){ pendingInserts.unshift(...batch); localStorage.setItem('roi_pending', JSON.stringify(pendingInserts)); }
+}
+
+/* ── Keyboard ── */
+document.addEventListener('keydown', e=>{
+  if(document.getElementById('nickModal').classList.contains('visible')) return;
+  if(openSheet){ if(e.key==='Escape') dismissSheet(); return; }
+  if(e.key==='ArrowRight')doSwipe('right'); else if(e.key==='ArrowLeft')doSwipe('left'); else if(e.key==='ArrowUp')doSwipe('up');
+});
+</script>
+</body>
+</html>
