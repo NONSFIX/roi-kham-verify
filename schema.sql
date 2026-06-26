@@ -80,6 +80,7 @@ as $$
   from words w
   left join vc on vc.word = w.word
   where coalesce(vc.votes, 0) < 3          -- VOTES_NEEDED
+    and w.word not like '% %'              -- skip multi-word phrases (one word per card)
   order by coalesce(vc.votes, 0) asc, random()
   limit greatest(1, least(p_count, 100));
 $$;
@@ -98,7 +99,7 @@ as $$
   select
     (select count(distinct word) from verifications
        where field = p_field)::bigint as done,
-    (select count(*) from words)::bigint as total;
+    (select count(*) from words where word not like '% %')::bigint as total;
 $$;
 
 -- ── leaderboard: top players by score ───────────────────────────────────────

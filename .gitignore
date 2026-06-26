@@ -10,3 +10,7 @@ venv/
 .DS_Store
 Thumbs.db
 .vscode/
+.claude/
+
+# Local design references (not used by the app)
+inspired/
