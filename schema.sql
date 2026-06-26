@@ -85,6 +85,9 @@ as $$
 $$;
 
 -- ── field_stats: progress bar for a given mode ──────────────────────────────
+-- "done" = how many distinct words have received at least one vote for this
+-- field, so the progress bar moves with every swipe. (Words still keep
+-- collecting votes up to VOTES_NEEDED before get_words stops handing them out.)
 create or replace function field_stats(p_field text)
 returns table (done bigint, total bigint)
 language sql
@@ -93,11 +96,8 @@ set search_path = public
 stable
 as $$
   select
-    (select count(*) from (
-        select word from verifications
-        where field = p_field
-        group by word having count(*) >= 3      -- VOTES_NEEDED
-     ) t)::bigint as done,
+    (select count(distinct word) from verifications
+       where field = p_field)::bigint as done,
     (select count(*) from words)::bigint as total;
 $$;
 
