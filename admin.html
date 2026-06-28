@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roi-Kham — Admin คำศัพท์</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0F1117;--surf:#1A1D27;--surf2:#232735;--border:#2E3344;--brand:#A78BFA;--text:#E8E8F0;--dim:#8B8FA8;--green:#6BCB77;--red:#FF6B6B}
+body{font-family:'Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px;font-size:14px}
+.wrap{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-family:'Prompt',sans-serif;font-size:1.3rem;color:var(--brand);font-weight:700}
+.sub{color:var(--dim);font-size:12px;margin-top:-10px}
+.card{background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:16px}
+.card h2{font-family:'Prompt',sans-serif;font-size:1rem;margin-bottom:10px;font-weight:600}
+label{display:block;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin:8px 0 4px}
+input,textarea,select{width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:14px;padding:9px 12px;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--brand)}
+textarea{min-height:90px;resize:vertical;line-height:1.7}
+button{font-family:'Prompt',sans-serif;font-weight:600;border:none;border-radius:8px;cursor:pointer;padding:10px 16px;font-size:14px;transition:filter .12s}
+button:hover{filter:brightness(1.1)}
+.btn-brand{background:var(--brand);color:#1A1228}
+.btn-ghost{background:var(--surf2);color:var(--text);border:1px solid var(--border)}
+.btn-red{background:#3a1a1a;color:var(--red);border:1px solid #5a2a2a}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1}
+.tabs{display:flex;gap:6px}
+.tab{flex:1;background:var(--surf2);border:1px solid var(--border);color:var(--dim);border-radius:8px;padding:8px}
+.tab.active{border-color:var(--brand);color:var(--brand);background:#1f1a2e}
+.hidden{display:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#log{font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap;color:var(--dim);max-height:160px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
+th{color:var(--dim);font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:1px}
+.pill{font-size:10px;padding:2px 8px;border-radius:99px;font-weight:700}
+.pill.pending{background:#33301a;color:#FFD93D}.pill.done{background:#16301f;color:var(--green)}.pill.error{background:#301a1a;color:var(--red)}
+.note{font-size:12px;color:var(--dim);line-height:1.7}
+code{background:var(--surf2);padding:1px 6px;border-radius:5px;color:var(--brand)}
+#gate{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;z-index:10}
+#gate input{max-width:280px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="app">
+  <div>
+    <h1>จัดการคำศัพท์ (Admin)</h1>
+    <p class="sub">เพิ่ม / แก้ไข / ลบ คำ — คำขอจะเข้าคิว แล้วรัน <code>python add_words.py --process</code></p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-t="add"  onclick="tab('add')">➕ เพิ่มคำ</button>
+    <button class="tab"        data-t="edit" onclick="tab('edit')">✏️ แก้ไข</button>
+    <button class="tab"        data-t="del"  onclick="tab('del')">🗑️ ลบ</button>
+    <button class="tab"        data-t="queue" onclick="tab('queue')">📋 คิว</button>
+  </div>
+
+  <!-- ADD -->
+  <div class="card" id="pane-add">
+    <h2>เพิ่มคำใหม่</h2>
+    <label>คำไทย (หนึ่งคำต่อบรรทัด)</label>
+    <textarea id="addWords" placeholder="แมว&#10;กล้วย&#10;รถไฟ"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn-brand" onclick="submitAdd()">เข้าคิวเพิ่มคำ</button>
+    </div>
+    <p class="note" style="margin-top:8px">คุณสมบัติ (ชนิดคำ/มาตรา/ฯลฯ) จะถูกคำนวณอัตโนมัติตอนรันสคริปต์</p>
+  </div>
+
+  <!-- EDIT -->
+  <div class="card hidden" id="pane-edit">
+    <h2>แก้ไขคำที่มีอยู่</h2>
+    <label>ค้นหาคำ</label>
+    <div class="row">
+      <input id="editSearch" placeholder="พิมพ์คำที่จะแก้ แล้วกด ค้น" onkeydown="if(event.key==='Enter')lookupEdit()">
+      <button class="btn-ghost" style="flex:0 0 auto" onclick="lookupEdit()">ค้น</button>
+    </div>
+    <div id="editForm" class="hidden" style="margin-top:12px">
+      <div class="grid2">
+        <div><label>ชนิดคำ (pos)</label><input id="e_pos"></div>
+        <div><label>มาตรา (final_class)</label><input id="e_final_class"></div>
+        <div><label>เป็น/ตาย (live_dead)</label><input id="e_live_dead"></div>
+        <div><label>อักษรนำ (leading_class)</label><input id="e_leading_class"></div>
+        <div><label>พยางค์ (syllables)</label><input id="e_syllables" type="number"></div>
+        <div><label>หมวด (categories)</label><input id="e_categories"></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn-brand" onclick="submitEdit()">เข้าคิวแก้ไข</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELETE -->
+  <div class="card hidden" id="pane-del">
+    <h2>ลบคำ</h2>
+    <label>คำที่จะลบ</label>
+    <div class="row">
+      <input id="delWord" placeholder="คำไทยที่จะลบออกจากฐานข้อมูล">
+      <button class="btn-red" style="flex:0 0 auto" onclick="submitDelete()">เข้าคิวลบ</button>
+    </div>
+  </div>
+
+  <!-- QUEUE -->
+  <div class="card hidden" id="pane-queue">
+    <h2>คิวล่าสุด <button class="btn-ghost" style="float:right;padding:4px 10px;font-size:12px" onclick="loadQueue()">รีเฟรช</button></h2>
+    <div id="queueWrap"><p class="note">กดรีเฟรชเพื่อโหลด</p></div>
+  </div>
+
+  <div class="card">
+    <h2>ผลลัพธ์</h2>
+    <div id="log">—</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+'use strict';
+/* Same project as the game (anon key is safe in the browser). */
+const SUPABASE_URL      = 'https://qoceonncejbvemcgtwsn.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_tfq2N5mE7rFspK9FEmT_bw_Xcv64LU1';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function log(msg, cls){ const l=document.getElementById('log'); const t=new Date().toLocaleTimeString(); l.textContent = `[${t}] ${msg}\n` + (l.textContent==='—'?'':l.textContent); }
+
+function tab(t){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.t===t));
+  ['add','edit','del','queue'].forEach(id=>document.getElementById('pane-'+id).classList.toggle('hidden',id!==t));
+  if(t==='queue') loadQueue();
+}
+
+async function queueChange(action, word, overrides, note){
+  const {error} = await sb.from('pending_words').insert({action, word, overrides:overrides||null, note:note||null});
+  if(error) throw error;
+  return 'queued';
+}
+
+async function submitAdd(){
+  const words = document.getElementById('addWords').value.split('\n').map(w=>w.trim()).filter(Boolean);
+  if(!words.length){ log('ไม่มีคำให้เพิ่ม'); return; }
+  let ok=0;
+  for(const w of words){
+    try{ const r = await queueChange('add', w); r==='queued'?ok++:log(`✗ ${w}: ${r}`); }
+    catch(e){ log(`✗ ${w}: ${e.message||e}`); }
+  }
+  log(`เข้าคิวเพิ่ม ${ok}/${words.length} คำแล้ว — รัน add_words.py --process เพื่อบันทึก`);
+  if(ok) document.getElementById('addWords').value='';
+}
+
+async function lookupEdit(){
+  const w = document.getElementById('editSearch').value.trim();
+  if(!w) return;
+  const {data,error} = await sb.from('words').select('*').eq('word',w).limit(1);
+  if(error){ log('ค้นหาไม่สำเร็จ: '+error.message); return; }
+  if(!data || !data.length){ log(`ไม่พบคำ "${w}" ในฐานข้อมูล`); document.getElementById('editForm').classList.add('hidden'); return; }
+  const row=data[0];
+  for(const f of ['pos','final_class','live_dead','leading_class','syllables','categories']){
+    document.getElementById('e_'+f).value = row[f] ?? '';
+  }
+  document.getElementById('editForm').dataset.word = w;
+  document.getElementById('editForm').classList.remove('hidden');
+  log(`โหลดคำ "${w}" แล้ว — แก้ไขช่องที่ต้องการ`);
+}
+
+async function submitEdit(){
+  const w = document.getElementById('editForm').dataset.word;
+  const ov = {};
+  for(const f of ['pos','final_class','live_dead','leading_class','categories']){
+    ov[f] = document.getElementById('e_'+f).value.trim();
+  }
+  const syl = document.getElementById('e_syllables').value.trim();
+  if(syl!=='') ov.syllables = parseInt(syl,10);
+  try{ const r = await queueChange('edit', w, ov); log(r==='queued'?`เข้าคิวแก้ไข "${w}" แล้ว`:`✗ ${r}`); }
+  catch(e){ log('✗ '+(e.message||e)); }
+}
+
+async function submitDelete(){
+  const w = document.getElementById('delWord').value.trim();
+  if(!w) return;
+  if(!confirm(`ลบคำ "${w}" ออกจากฐานข้อมูล?`)) return;
+  try{ const r = await queueChange('delete', w); log(r==='queued'?`เข้าคิวลบ "${w}" แล้ว`:`✗ ${r}`); if(r==='queued') document.getElementById('delWord').value=''; }
+  catch(e){ log('✗ '+(e.message||e)); }
+}
+
+async function loadQueue(){
+  const wrap=document.getElementById('queueWrap');
+  wrap.innerHTML='<p class="note">กำลังโหลด...</p>';
+  const {data,error} = await sb.from('pending_words').select('*').order('id',{ascending:false}).limit(100);
+  if(error){ wrap.innerHTML='<p class="note" style="color:var(--red)">โหลดคิวไม่ได้: '+error.message+'</p>'; return; }
+  if(!data || !data.length){ wrap.innerHTML='<p class="note">คิวว่าง</p>'; return; }
+  let h='<table><thead><tr><th>#</th><th>คำ</th><th>action</th><th>สถานะ</th><th>หมวด / จัดการ</th></tr></thead><tbody>';
+  for(const r of data){
+    const cat = (r.overrides && r.overrides.categories) || '';
+    const manage = r.status==='pending'
+      ? `<input id="cat-${r.id}" placeholder="หมวด เช่น animal" value="${cat}" style="width:120px;display:inline-block;padding:4px 8px">
+         <button class="btn-ghost" style="padding:4px 8px" onclick="setCat(${r.id})" title="ตั้งหมวด">✓</button>
+         <button class="btn-red" style="padding:4px 8px" onclick="removePending(${r.id})" title="ลบออกจากคิว">🗑️</button>`
+      : (r.result||'');
+    h+=`<tr><td>${r.id}</td><td>${r.word||'—'}</td><td>${r.action}</td><td><span class="pill ${r.status}">${r.status}</span></td><td>${manage}</td></tr>`;
+  }
+  wrap.innerHTML=h+'</tbody></table>';
+}
+
+async function setCat(id){
+  const v=document.getElementById('cat-'+id).value.trim();
+  const overrides = v ? {categories:v} : {};
+  const {error}=await sb.from('pending_words').update({overrides}).eq('id',id);
+  log(error ? ('✗ '+error.message) : `ตั้งหมวด #${id} = "${v||'(ว่าง)'}"`);
+}
+
+async function removePending(id){
+  if(!confirm('ลบรายการนี้ออกจากคิว?')) return;
+  const {error}=await sb.from('pending_words').delete().eq('id',id);
+  if(error){ log('✗ '+error.message); return; }
+  log(`ลบ #${id} ออกจากคิวแล้ว`); loadQueue();
+}
+</script>
+</body>
+</html>

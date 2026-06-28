@@ -329,13 +329,29 @@ header {
 }
 #config-error.visible { display:flex; }
 #config-error code { background:rgba(255,255,255,.1); padding:2px 10px; border-radius:8px; color:var(--brand2); font-size:13px; }
+
+/* ── Quiz mode ── */
+body[data-mode="quiz_pos"]   { --mode-color:#A78BFA; --mode-color-bg:rgba(167,139,250,.14); }
+body[data-mode="quiz_final"] { --mode-color:#A78BFA; --mode-color-bg:rgba(167,139,250,.14); }
+body[data-mode="quiz_spell"] { --mode-color:#A78BFA; --mode-color-bg:rgba(167,139,250,.14); }
+.mode-card[data-modeid="quiz_pos"],
+.mode-card[data-modeid="quiz_final"],
+.mode-card[data-modeid="quiz_spell"] { border-left-color:#A78BFA; }
+.mode-divider { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:var(--dim); font-weight:700; margin:6px 2px 10px; display:flex; align-items:center; gap:8px; }
+.mode-divider::after { content:''; flex:1; height:1px; background:#ECECF4; }
+.card-quiz-prompt { font-family:'Prompt',sans-serif; font-size:1.35rem; font-weight:700; color:var(--text); text-align:center; line-height:1.4; padding:0 4px; }
+.card-quiz-prompt b { color:var(--mode-color); }
+.quiz-guess-tag { font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--mode-color); font-weight:700; }
+#bigFlash { position:absolute; top:34%; left:50%; transform:translate(-50%,-50%); font-family:'Prompt',sans-serif; font-size:3.4rem; font-weight:800; pointer-events:none; opacity:0; z-index:5; text-shadow:0 4px 18px rgba(0,0,0,.5); }
+#bigFlash.go { animation:bigPop 720ms cubic-bezier(.2,.8,.3,1) forwards; }
+@keyframes bigPop { 0%{opacity:0;transform:translate(-50%,-25%) scale(.5);} 22%{opacity:1;transform:translate(-50%,-50%) scale(1.15);} 55%{opacity:1;transform:translate(-50%,-60%) scale(1);} 100%{opacity:0;transform:translate(-50%,-130%) scale(.95);} }
 </style>
 </head>
-<body>
+<body data-mode="quiz_pos">
 
 <header>
   <button class="mode-badge" id="modeSelectorBtn" onclick="openModePicker()">
-    <span id="modeLabel">📝 ชนิดคำ</span><span class="arrow">▾</span>
+    <span id="modeLabel">🎮 เกมทายชนิดคำ</span><span class="arrow">▾</span>
   </button>
   <div class="header-logo">ROI·KHAM</div>
   <div class="score-wrap">
@@ -343,7 +359,6 @@ header {
     <span id="streakEl"></span>
     <span class="score-flash" id="scoreFlash"></span>
   </div>
-  <button class="icon-btn" onclick="openLeaderboard()" title="อันดับ">🏆</button>
 </header>
 
 <div class="layout">
@@ -355,10 +370,11 @@ header {
   <div id="arena">
     <div id="loadingState"><div class="spinner"></div><p>กำลังโหลดคำ...</p></div>
     <div id="emptyState">
-      <div class="empty-icon">🎉</div>
-      <h2>ตรวจสอบครบแล้ว!</h2>
-      <p>คำในโหมดนี้ได้รับการตรวจครบทุกคำแล้ว<br>ลองสลับไปโหมดอื่นดูสิ</p>
+      <div class="empty-icon">🎮</div>
+      <h2>โหลดคำไม่ได้</h2>
+      <p>ลองรีเฟรชหน้า หรือสลับโหมดดูอีกครั้ง</p>
     </div>
+    <div id="bigFlash"></div>
   </div>
 
   <div class="hint-row">
@@ -372,44 +388,8 @@ header {
 
 <div class="sheet" id="modePicker">
   <div class="sheet-handle"></div>
-  <div class="sheet-title">เลือกโหมดการตรวจสอบ</div>
+  <div class="sheet-title">เลือกโหมดเกม</div>
   <div id="modeCards"></div>
-</div>
-
-<div class="sheet" id="correctionSheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-wrong-word" id="sheetWord"></div>
-  <div class="sheet-wrong-current" id="sheetCurrent"></div>
-  <div class="sheet-title">เลือกคำตอบที่ถูกต้อง</div>
-  <div class="option-grid" id="optionGrid"></div>
-  <button class="sheet-cancel" onclick="dismissSheet()">ยกเลิก — ข้ามคำนี้</button>
-</div>
-
-<div class="sheet" id="catSelectSheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-wrong-word" id="catSheetWord"></div>
-  <div class="sheet-title" style="margin-top:8px">เลือกหมวดหมู่ที่ถูกต้อง (เลือกได้หลายหมวด)</div>
-  <div class="cat-chip-grid" id="catChipGrid"></div>
-  <button class="confirm-btn" onclick="confirmCatSelection()">ยืนยันการแก้ไข</button>
-  <button class="sheet-cancel" onclick="dismissSheet()">ยกเลิก — ข้ามคำนี้</button>
-</div>
-
-<div class="sheet" id="leaderboardSheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-title">🏆 อันดับผู้เล่น</div>
-  <div id="lbList"></div>
-</div>
-
-<div id="nickModal">
-  <div class="nick-top">
-    <div class="mascot-placeholder" style="width:160px;height:160px;border-color:rgba(255,255,255,.5);color:rgba(255,255,255,.6)">🎨 mascot</div>
-    <div class="nick-logo">ROI-KHAM</div>
-  </div>
-  <div class="nick-bottom">
-    <p class="nick-tagline">ช่วยกันตรวจสอบคำภาษาไทย<br>ปัดขวา = ถูก · ปัดซ้าย = ผิด · ปัดขึ้น = ข้าม</p>
-    <input id="nickInput" maxlength="20" placeholder="ใส่ชื่อเล่นของคุณ" autocomplete="off">
-    <button id="nickStart">เริ่มเล่น! →</button>
-  </div>
 </div>
 
 <div id="streakCelebration">
@@ -425,6 +405,8 @@ header {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Local word data: fallback word source + spelling-check set for the quiz -->
+<script src="words.js"></script>
 <script>
 'use strict';
 
@@ -453,55 +435,28 @@ const FINAL_MAP = [
   {th:'แม่กน',db:'กน'},{th:'แม่กม',db:'กม'},{th:'แม่เกย',db:'เกย'},{th:'แม่เกอว',db:'เกอว'},
   {th:'แม่ก กา (ไม่มีตัวสะกด)',db:'none'},
 ];
-const LIVEDEAD_MAP = [{th:'เป็น (Live)',db:'live'},{th:'ตาย (Dead)',db:'dead'}];
-const LEAD_MAP = [{th:'อักษรกลาง',db:'mid'},{th:'อักษรต่ำ',db:'low'},{th:'อักษรสูง',db:'high'}];
-const CAT_MAP = {
-  animal:'สัตว์',plant:'พืช',food:'อาหาร',drink:'เครื่องดื่ม',fruit:'ผลไม้',vegetable:'ผัก',
-  vehicle:'ยานพาหนะ',house_item:'ของใช้ในบ้าน',body_part:'อวัยวะ',family:'ครอบครัว',
-  color:'สี',shape:'รูปทรง',nature:'ธรรมชาติ',weather:'สภาพอากาศ',sport:'กีฬา',hobby:'งานอดิเรก',
-};
-const CAT_ARRAY = Object.entries(CAT_MAP).map(([db,th])=>({db,th}));
-
 const MODES = [
-  {id:'pos',     th:'ชนิดคำ',       sub:'POS · 12 ประเภท',    icon:'📝', field:'pos',           prop:'pos',           multi:false, map:POS_MAP},
-  {id:'final',   th:'มาตราตัวสะกด', sub:'8 มาตรา + กา',       icon:'🔤', field:'final_class',   prop:'final_class',   multi:false, map:FINAL_MAP},
-  {id:'livedead',th:'เสียงคำ',      sub:'เป็น / ตาย',          icon:'🔊', field:'live_dead',     prop:'live_dead',     multi:false, map:LIVEDEAD_MAP},
-  {id:'lead',    th:'อักษร 3 หมู่', sub:'กลาง / ต่ำ / สูง',   icon:'🎯', field:'leading_class', prop:'leading_class', multi:false, map:LEAD_MAP},
-  {id:'cats',    th:'หมวดหมู่คำ',   sub:'Semantic · 16 หมวด',  icon:'🏷️', field:'categories',    prop:'categories',    multi:true,  map:CAT_ARRAY},
+  {id:'quiz_pos',   th:'เกมทายชนิดคำ',  sub:'ทายถูก/ผิด · ชนิดคำ',    icon:'🎮', qkind:'pos'},
+  {id:'quiz_final', th:'เกมทายมาตรา',   sub:'ทายถูก/ผิด · ตัวสะกด',   icon:'🎮', qkind:'final'},
+  {id:'quiz_spell', th:'เกมทายคำสะกด',  sub:'ทายถูก/ผิด · สะกดถูกไหม', icon:'🎮', qkind:'spell'},
 ];
 
 /* ── State ── */
 let sb = null;
-let modeId = 'pos';
+let modeId = 'quiz_pos';
 let queue = [];
 let currentWord = null;
 let activeCard = null;
 let openSheet = null;
-let pendingWord = null;
-let catSelection = new Set();
 let fetching = false;
-let nickname = '';
-let deviceId = '';
-
-let sessionScore = 0, streak = 0, sinceStatRefresh = 0;
-let pendingInserts = [];
 
 const SWIPE_THRESHOLD = 75, ROT_MAX = 15;
 let dragging=false, startX=0, startY=0, dx=0, dy=0;
 
 /* ── Helpers ── */
 function modeObj(){ return MODES.find(m=>m.id===modeId); }
-function getVal(w){ return (w && w[modeObj().prop]) || ''; }
 function el(tag,cls,text){ const d=document.createElement(tag); d.className=cls; if(text!==undefined) d.textContent=text; return d; }
-function getLabel(dbVal){
-  const m=modeObj();
-  if(m.multi){ if(!dbVal) return '(ไม่มีหมวดหมู่)'; return dbVal.split(',').filter(Boolean).map(c=>CAT_MAP[c]||c).join(', '); }
-  return (m.map.find(x=>x.db===dbVal)||{th:dbVal||'—'}).th;
-}
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
-
-const AVATAR_COLORS = ['#FF6B35','#4FC3F7','#6BCB77','#FFD93D','#FF6B9D','#A78BFA'];
-function avatarColor(name){ return AVATAR_COLORS[(name||'?').charCodeAt(0)%AVATAR_COLORS.length]; }
 
 /* ── Streak celebration ── */
 function triggerCelebration(s){
@@ -512,43 +467,205 @@ function triggerCelebration(s){
   cel.classList.remove('flash'); void cel.offsetWidth; cel.classList.add('flash');
 }
 
-/* ── Boot ── */
-document.addEventListener('DOMContentLoaded', () => {
-  if (!SUPABASE_URL.startsWith('http') || SUPABASE_ANON_KEY.length < 20) {
-    document.getElementById('config-error').classList.add('visible');
-    return;
+/* ── Sound effects (Web Audio — no files, works in a single shared html) ── */
+let _ac=null;
+function audioCtx(){
+  if(_ac===null){ try{ _ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(_){ _ac=false; } }
+  return _ac || null;
+}
+function beep(freqs, dur, type, gain){
+  const ac=audioCtx(); if(!ac) return;
+  if(ac.state==='suspended'){ try{ ac.resume(); }catch(_){} }
+  let t=ac.currentTime;
+  for(const f of freqs){
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.type=type; o.frequency.setValueAtTime(f,t);
+    o.connect(g); g.connect(ac.destination);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(gain,t+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.start(t); o.stop(t+dur+0.02);
+    t+=dur*0.85;
   }
-  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  deviceId = localStorage.getItem('roi_device');
-  if (!deviceId) { deviceId = (crypto.randomUUID && crypto.randomUUID()) || ('d'+Date.now()+Math.random()); localStorage.setItem('roi_device', deviceId); }
-  try { pendingInserts = JSON.parse(localStorage.getItem('roi_pending')||'[]'); } catch(_){ pendingInserts=[]; }
-
-  nickname = localStorage.getItem('roi_nick') || '';
-  if (nickname) startGame();
-  else showNickModal();
-
-  document.getElementById('nickStart').addEventListener('click', submitNick);
-  document.getElementById('nickInput').addEventListener('keydown', e=>{ if(e.key==='Enter') submitNick(); });
-});
-
-function showNickModal(){ document.getElementById('nickModal').classList.add('visible'); setTimeout(()=>document.getElementById('nickInput').focus(),100); }
-function submitNick(){
-  const v=document.getElementById('nickInput').value.trim();
-  if(!v){ document.getElementById('nickInput').focus(); return; }
-  nickname=v; localStorage.setItem('roi_nick', v);
-  document.getElementById('nickModal').classList.remove('visible');
-  startGame();
+}
+function playSfx(kind){
+  if(kind==='correct')    beep([660,990], 0.13, 'triangle', 0.10);   // bright two-note ding
+  else if(kind==='wrong') beep([196,138], 0.20, 'sawtooth', 0.06);   // low descending buzz
+  else                    beep([430], 0.05, 'sine', 0.03);           // soft skip click
 }
 
+/* ── Big floating +N / −1 over the card ── */
+function bigFlash(pts){
+  if(!pts) return;
+  const b=document.getElementById('bigFlash'); if(!b) return;
+  b.textContent=(pts>0?'+':'')+pts;
+  b.style.color = pts>0 ? 'var(--green)' : 'var(--red)';
+  b.classList.remove('go'); void b.offsetWidth; b.classList.add('go');
+}
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  QUIZ MODE — true/false swipe game (right=ถูก, left=ผิด, up=ข้าม) ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+let quizScore=0, quizStreak=0, quizBest=0, quizAnswered=0, quizSkip=0;
+
+const randOf = a => a[Math.floor(Math.random()*a.length)];
+
+// Thai labels reused from the verify maps
+const POS_TH       = Object.fromEntries(POS_MAP.map(o=>[o.db,o.th]));       // 'NOUN'->'คำนาม'
+const POS_TH_LIST  = POS_MAP.filter(o=>o.db).map(o=>o.th);
+const FINAL_TH     = Object.fromEntries(FINAL_MAP.map(o=>[o.db,o.th]));
+const FINAL_TH_LIST= FINAL_MAP.map(o=>o.th);
+function finalLabel(db){ if(!db||db==='none') return FINAL_TH['none']; return FINAL_TH[db]||null; }
+
+// Same-sound Thai consonant groups (real consonants only) for spelling corruption
+const CONFUSE_GROUPS=[['ส','ศ','ษ','ซ'],['ต','ฏ','ถ','ฐ','ท','ธ','ฑ','ฒ'],['น','ณ'],
+  ['ก','ข','ฃ','ค','ฅ','ฆ'],['พ','ภ','ป'],['ช','ฌ','ฉ'],['ด','ฎ'],['ล','ฬ'],['ห','ฮ'],['ย','ญ']];
+const CONFUSE_MAP={}; CONFUSE_GROUPS.forEach(g=>g.forEach(c=>{CONFUSE_MAP[c]=g;}));
+const isThaiWord = w => /^[฀-๿]+$/.test(w);
+function makeMisspelling(word){
+  const DB=window.WORD_DB; if(!DB) return null;        // need a real-word set to verify against
+  const chars=[...word], spots=[];
+  chars.forEach((c,i)=>{ if(CONFUSE_MAP[c]) spots.push(i); });
+  for(let i=spots.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [spots[i],spots[j]]=[spots[j],spots[i]]; }
+  for(const p of spots){
+    const alts=CONFUSE_MAP[chars[p]].filter(c=>c!==chars[p]);
+    for(let i=alts.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [alts[i],alts[j]]=[alts[j],alts[i]]; }
+    for(const alt of alts){ const cand=chars.slice(); cand[p]=alt; const s=cand.join(''); if(s!==word && !(s in DB)) return s; }
+  }
+  return null;
+}
+
+// ── Build the {display, prompt, correct, reveal} question on a word row ──
+function attachQuiz(w){
+  const kind=modeObj().qkind;
+  w._q = kind==='pos' ? genQPos(w) : kind==='final' ? genQFinal(w) : genQSpell(w);
+  return w;
+}
+function genQPos(w){
+  const real=POS_TH[w.pos];
+  if(!w.pos || !real) return null;
+  const showTrue=Math.random()<0.5;
+  const claim=showTrue ? real : randOf(POS_TH_LIST.filter(x=>x!==real));
+  return { display:w.word, prompt:`เป็น <b>${claim}</b> ใช่ไหม?`, correct:showTrue, reveal:`“${w.word}” เป็น${real}` };
+}
+function genQFinal(w){
+  const real=finalLabel(w.final_class);
+  if(!real) return null;
+  const showTrue=Math.random()<0.5;
+  const claim=showTrue ? real : randOf(FINAL_TH_LIST.filter(x=>x!==real));
+  return { display:w.word, prompt:`อยู่ในมาตรา <b>${claim}</b> ใช่ไหม?`, correct:showTrue, reveal:`“${w.word}” อยู่ในมาตรา${real}` };
+}
+function genQSpell(w){
+  if(!isThaiWord(w.word) || [...w.word].length<2) return null;
+  if(Math.random()<0.5){
+    const bad=makeMisspelling(w.word);
+    if(bad) return { display:bad, prompt:'สะกดถูกหรือไม่?', correct:false, reveal:`สะกดผิด — ที่ถูกคือ “${w.word}”` };
+  }
+  return { display:w.word, prompt:'สะกดถูกหรือไม่?', correct:true, reveal:`“${w.word}” สะกดถูกแล้ว` };
+}
+
+// ── Word source: Supabase quiz_words, fall back to local words.js ──
+let _localWords=null, _localSyl=null;
+function localWordPool(){
+  if(_localWords) return _localWords;
+  const DB=window.WORD_DB||{}; _localWords=[];
+  for(const w in DB){ if(w.indexOf(' ')<0) _localWords.push(w); }
+  return _localWords;
+}
+// ทายมาตรา offline fallback: whole words that are already a single syllable
+function localSyllablePool(){
+  if(_localSyl) return _localSyl;
+  const DB=window.WORD_DB||{}; _localSyl=[];
+  for(const w in DB){ if(w.indexOf(' ')<0 && DB[w][0]===1) _localSyl.push(w); }
+  return _localSyl.length ? _localSyl : localWordPool();
+}
+function localRow(w){ const e=window.WORD_DB[w]; return { word:w, syllables:e[0], pos:e[1], live_dead:e[2], final_class:e[3], leading_class:e[4], categories:e[7]||'' }; }
+async function quizFetch(count){
+  const isFinal = modeObj().qkind === 'final';          // ทายมาตรา → syllables
+  const rpc = isFinal ? 'quiz_syllables' : 'quiz_words';
+  if(sb){
+    try{ const {data,error}=await sb.rpc(rpc,{p_count:count}); if(error) throw error; if(data&&data.length) return data; }
+    catch(_){ /* fall back to local */ }
+  }
+  const pool = isFinal ? localSyllablePool() : localWordPool();
+  const out=[];
+  for(let i=0;i<count && pool.length;i++) out.push(localRow(pool[Math.floor(Math.random()*pool.length)]));
+  return out;
+}
+
+// ── Quiz card (no answer revealed) ──
+function createQuizCard(w, isNext){
+  const q=w._q, sylCnt=w.syllables||1;
+  const card=document.createElement('div');
+  card.className='card '+(isNext?'card-next':'card-active');
+  if(!isNext){
+    [['overlay-right','ov-r'],['overlay-left','ov-l'],['overlay-up','ov-u']].forEach(([cls,id])=>{ const d=el('div','overlay '+cls); d.id=id; card.appendChild(d); });
+    [['label-right','✓ ถูก'],['label-left','✗ ผิด'],['label-up','↑ ข้าม']].forEach(([cls,txt])=>card.appendChild(el('div','overlay-label '+cls,txt)));
+  }
+  card.appendChild(el('div','mascot-placeholder','🎮'));
+  const wrap=el('div','card-word-wrap');
+  wrap.appendChild(el('div','card-word', q?q.display:w.word));
+  if(sylCnt>1){ const dots=el('div','syl-dots'); for(let i=0;i<Math.min(sylCnt,6);i++) dots.appendChild(el('span','syl-dot filled')); wrap.appendChild(dots); }
+  card.appendChild(wrap);
+  card.appendChild(el('div','card-divider'));
+  card.appendChild(el('div','quiz-guess-tag','ทาย — จริงหรือไม่?'));
+  const p=el('div','card-quiz-prompt'); p.innerHTML=q?q.prompt:'—'; card.appendChild(p);
+  return card;
+}
+
+// ── Quiz swipe = answer ──
+function doQuizSwipe(dir){
+  if(!activeCard||!currentWord) return;
+  const q=currentWord._q;
+  if(dir==='up'){
+    quizStreak=0; quizSkip++;
+    let pts=0; if(quizSkip%3===0){ pts=-1; quizScore+=pts; }
+    quizFlash(pts,'ข้าม', q?q.reveal:''); refreshScoreDisplay();
+    playSfx('skip'); bigFlash(pts);
+    flyOut('up'); setTimeout(advance,320); return;
+  }
+  const answer=(dir==='right');                 // right=ถูก(true), left=ผิด(false)
+  const correct = !!q && (answer===q.correct);
+  quizAnswered++;
+  let pts;
+  if(correct){ quizStreak++; pts=quizStreak; quizScore+=pts; if(quizStreak>quizBest) quizBest=quizStreak; }
+  else { pts=-1; quizScore+=pts; quizStreak=0; }
+  quizFlash(pts, correct?'ถูกต้อง':'ผิด', q?q.reveal:'');
+  playSfx(correct?'correct':'wrong'); bigFlash(pts);
+  refreshScoreDisplay();
+  if(correct && (quizStreak===5||quizStreak===10||quizStreak===20)) triggerCelebration(quizStreak);
+  flyOut(dir); setTimeout(advance,320);
+}
+
+function quizFlash(pts, label, reveal){
+  const f=document.getElementById('scoreFlash');
+  f.style.color = pts<0 ? 'var(--red)' : (pts>0 ? 'var(--green)' : 'var(--dim)');
+  f.textContent = (pts>0?'+':'')+pts;
+  f.classList.remove('pop'); void f.offsetWidth; f.classList.add('pop');
+  const icon = label==='ถูกต้อง'?'✓' : label==='ผิด'?'✗' : '↑';
+  toast(reveal ? `${icon} ${label} — ${reveal}` : `${icon} ${label}`);
+}
+function refreshScoreDisplay(){
+  document.getElementById('scoreEl').textContent = `⭐ ${quizScore.toLocaleString()}`;
+  document.getElementById('streakEl').textContent = quizStreak>=3?`🔥${quizStreak}`:'';
+}
+
+/* ── Boot — anonymous, starts immediately (no nickname) ── */
+document.addEventListener('DOMContentLoaded', () => {
+  if (SUPABASE_URL.startsWith('http') && SUPABASE_ANON_KEY.length >= 20) {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  startGame();   // works offline from words.js if Supabase isn't configured
+});
+
 async function startGame(){
-  flushPending();
   buildModeCards();
   setLoading(true);
   await refill(true);
   setLoading(false);
   renderCards();
   updateHeader();
+  refreshScoreDisplay();
   refreshStats();
 }
 
@@ -559,14 +676,13 @@ async function refill(reset){
   if (fetching) return;
   fetching = true;
   try {
-    const { data, error } = await sb.rpc('get_words', { p_field: modeObj().field, p_count: BUFFER_SIZE });
-    if (error) throw error;
     const have = new Set(queue.map(w=>w.word));
-    const fresh = (data||[]).filter(w=>!have.has(w.word));
+    const rows = await quizFetch(BUFFER_SIZE);
+    const fresh = rows.map(attachQuiz).filter(w=>w._q && !have.has(w.word));
     if (reset) queue = fresh; else queue.push(...fresh);
   } catch(e){
     console.error(e);
-    toast('โหลดคำไม่สำเร็จ — ตรวจการเชื่อมต่อ');
+    toast('โหลดคำไม่สำเร็จ');
   } finally {
     fetching = false;
   }
@@ -587,36 +703,7 @@ function renderCards(){
   arena.appendChild(card); activeCard=card; attachDrag(card);
 }
 
-function createCard(w, isNext){
-  const m=modeObj();
-  const dbVal=getVal(w);
-  const sylCnt=w.syllables||1;
-  const cats=w.categories?w.categories.split(',').filter(Boolean):[];
-  const card=document.createElement('div');
-  card.className='card '+(isNext?'card-next':'card-active');
-  if(!isNext){
-    [['overlay-right','ov-r'],['overlay-left','ov-l'],['overlay-up','ov-u']].forEach(([cls,id])=>{ const d=el('div','overlay '+cls); d.id=id; card.appendChild(d); });
-    [['label-right','✓ ถูก'],['label-left','✗ ผิด'],['label-up','↑ ข้าม']].forEach(([cls,txt])=>card.appendChild(el('div','overlay-label '+cls,txt)));
-  }
-  /* Mascot placeholder */
-  const mascot=el('div','mascot-placeholder','🎨');
-  card.appendChild(mascot);
-  const wrap=el('div','card-word-wrap');
-  wrap.appendChild(el('div','card-word',w.word));
-  if(sylCnt>1){ const dots=el('div','syl-dots'); for(let i=0;i<Math.min(sylCnt,6);i++) dots.appendChild(el('span','syl-dot filled')); wrap.appendChild(dots); }
-  card.appendChild(wrap);
-  card.appendChild(el('div','card-divider'));
-  card.appendChild(el('div','card-field-label',m.th));
-  if(m.id==='cats'){
-    if(cats.length){ const t=el('div','cat-tags-verify'); cats.forEach(c=>t.appendChild(el('span','cat-tag-verify',CAT_MAP[c]||c))); card.appendChild(t); }
-    else card.appendChild(el('div','cat-tag-empty','(ไม่มีหมวดหมู่)'));
-  } else {
-    card.appendChild(el('div','card-classification',getLabel(dbVal)||'—'));
-    if(dbVal && dbVal!==getLabel(dbVal)) card.appendChild(el('div','card-sub',dbVal));
-    if(cats.length){ const t=el('div','cat-tags'); cats.slice(0,5).forEach(c=>t.appendChild(el('span','cat-tag',CAT_MAP[c]||c))); card.appendChild(t); }
-  }
-  return card;
-}
+function createCard(w, isNext){ return createQuizCard(w, isNext); }
 
 /* ── Drag ── */
 function attachDrag(card){ card.addEventListener('pointerdown', onDown); }
@@ -640,36 +727,9 @@ function cleanupDrag(){ if(!activeCard)return; activeCard.removeEventListener('p
 function snapBack(){ if(!activeCard)return; activeCard.classList.add('snap-back'); activeCard.style.transform=''; activeCard.querySelectorAll('.overlay,.overlay-label').forEach(d=>d.style.opacity='0'); activeCard.addEventListener('transitionend',()=>activeCard&&activeCard.classList.remove('snap-back'),{once:true}); }
 
 /* ── Swipe actions ── */
-function doSwipe(dir){
-  if(!activeCard||!currentWord) return;
-  if(dir==='right'){ saveVerification(currentWord,'correct',null); flyOut('right'); setTimeout(advance,320); }
-  else if(dir==='up'){ resetStreak(); flyOut('up'); queue.push(queue.shift()); setTimeout(renderCards,320); }
-  else { snapBack(); pendingWord=currentWord; modeObj().multi?showCatSelectSheet():showCorrectionSheet(); }
-}
+function doSwipe(dir){ if(activeCard && currentWord) doQuizSwipe(dir); }
 function flyOut(dir){ if(!activeCard)return; const n=document.getElementById('arena').querySelector('.card-next'); if(n)n.style.transform='scale(1) translateY(0)'; activeCard.classList.add('exit-'+dir); }
 function advance(){ queue.shift(); renderCards(); updateHeader(); if(queue.length<=REFILL_AT) refill(false).then(()=>{ if(!currentWord) renderCards(); }); }
-
-/* ── Correction sheet ── */
-function showCorrectionSheet(){
-  const w=pendingWord, dbVal=getVal(w);
-  document.getElementById('sheetWord').textContent=w.word;
-  document.getElementById('sheetCurrent').textContent=`ค่าปัจจุบัน: ${getLabel(dbVal)}  (${dbVal||'ว่าง'})`;
-  const grid=document.getElementById('optionGrid'); grid.innerHTML='';
-  for(const opt of modeObj().map){ const b=document.createElement('button'); b.className='option-btn'+(opt.db===dbVal?' current-val':''); b.textContent=opt.th; b.onclick=()=>selectCorrection(opt.db); grid.appendChild(b); }
-  showSheet('correctionSheet','correction');
-}
-function selectCorrection(db){ const w=pendingWord; hideAllSheets(); saveVerification(w,'wrong',db); flyOut('left'); setTimeout(advance,320); }
-
-/* ── Category sheet ── */
-function showCatSelectSheet(){
-  const w=pendingWord; const curr=w.categories||'';
-  catSelection=new Set(curr.split(',').filter(Boolean));
-  document.getElementById('catSheetWord').textContent=w.word;
-  const grid=document.getElementById('catChipGrid'); grid.innerHTML='';
-  for(const opt of CAT_ARRAY){ const b=document.createElement('button'); b.className='cat-chip'+(catSelection.has(opt.db)?' selected':''); b.textContent=opt.th; b.onclick=()=>{ catSelection.has(opt.db)?catSelection.delete(opt.db):catSelection.add(opt.db); b.classList.toggle('selected',catSelection.has(opt.db)); }; grid.appendChild(b); }
-  showSheet('catSelectSheet','catSelect');
-}
-function confirmCatSelection(){ const w=pendingWord; const corr=[...catSelection].sort().join(','); hideAllSheets(); saveVerification(w,'wrong',corr); flyOut('left'); setTimeout(advance,320); }
 
 /* ── Mode picker ── */
 function buildModeCards(){
@@ -678,61 +738,24 @@ function buildModeCards(){
     const b=document.createElement('button');
     b.className='mode-card'+(m.id===modeId?' current':'');
     b.dataset.modeid=m.id;
-    b.innerHTML=`<span class="mode-card-icon">${m.icon}</span><span class="mode-card-info"><span class="mode-card-name">${m.th}</span><span class="mode-card-sub">${m.sub}</span></span><span class="mode-card-progress" id="mc-${m.id}">—</span>`;
+    b.innerHTML=`<span class="mode-card-icon">${m.icon}</span><span class="mode-card-info"><span class="mode-card-name">${m.th}</span><span class="mode-card-sub">${m.sub}</span></span>`;
     b.onclick=()=>selectMode(m.id); c.appendChild(b);
   }
 }
-function openModePicker(){ buildModeCards(); loadModeProgress(); showSheet('modePicker','mode'); }
-async function loadModeProgress(){
-  for(const m of MODES){
-    try{ const {data}=await sb.rpc('field_stats',{p_field:m.field}); if(data&&data[0]){ const {done,total}=data[0]; const pct=total?(done/total*100).toFixed(1):'0.0'; const e=document.getElementById('mc-'+m.id); if(e) e.innerHTML=`${Number(done).toLocaleString()}<br>(${pct}%)`; } }catch(_){}
-  }
-}
+function openModePicker(){ buildModeCards(); showSheet('modePicker','mode'); }
 async function selectMode(id){
   hideAllSheets();
   if(id===modeId) return;
   modeId=id; queue=[]; currentWord=null;
   setLoading(true); await refill(true); setLoading(false);
-  renderCards(); updateHeader(); refreshStats();
-}
-
-/* ── Leaderboard ── */
-async function openLeaderboard(){
-  const list=document.getElementById('lbList');
-  list.innerHTML='<p style="text-align:center;color:var(--dim);padding:20px">กำลังโหลด...</p>';
-  showSheet('leaderboardSheet','leaderboard');
-  try{
-    const {data,error}=await sb.rpc('leaderboard',{p_limit:15});
-    if(error) throw error;
-    if(!data||!data.length){ list.innerHTML='<p style="text-align:center;color:var(--dim);padding:20px">ยังไม่มีผู้เล่น</p>'; return; }
-    list.innerHTML='';
-    data.forEach((row,i)=>{
-      const r=el('div','lb-row');
-      r.appendChild(el('span','lb-rank', i===0?'🥇':i===1?'🥈':i===2?'🥉':String(i+1)));
-      const av=el('div','lb-avatar'); av.style.background=avatarColor(row.nickname); av.textContent=(row.nickname||'?')[0].toUpperCase(); r.appendChild(av);
-      r.appendChild(el('span','lb-name'+(row.nickname===nickname?' me':''), row.nickname));
-      const sc=el('div','lb-score-col'); sc.appendChild(el('div','lb-score','⭐ '+Number(row.score).toLocaleString())); sc.appendChild(el('div','lb-total',Number(row.total).toLocaleString()+' คำ'));
-      r.appendChild(sc); list.appendChild(r);
-    });
-  }catch(e){ console.error(e); list.innerHTML='<p style="text-align:center;color:var(--red);padding:20px">โหลดอันดับไม่สำเร็จ</p>'; }
+  renderCards(); updateHeader(); refreshScoreDisplay(); refreshStats();
 }
 
 /* ── Sheet management ── */
 function showSheet(id,name){ document.getElementById('backdrop').classList.add('visible'); document.getElementById(id).classList.add('visible'); openSheet=name; }
-function hideAllSheets(){ document.getElementById('backdrop').classList.remove('visible'); ['modePicker','correctionSheet','catSelectSheet','leaderboardSheet'].forEach(id=>document.getElementById(id).classList.remove('visible')); openSheet=null; pendingWord=null; }
+function hideAllSheets(){ document.getElementById('backdrop').classList.remove('visible'); document.getElementById('modePicker').classList.remove('visible'); openSheet=null; }
 function dismissSheet(){ hideAllSheets(); snapBack(); }
-function handleBackdropClick(){ if(openSheet==='mode'||openSheet==='leaderboard') hideAllSheets(); else dismissSheet(); }
-
-/* ── Score ── */
-function addScore(type){
-  const earned=(type==='correction'?20:10)+Math.floor(streak/5)*2;
-  sessionScore+=earned; streak++;
-  document.getElementById('scoreEl').textContent=`⭐ ${sessionScore.toLocaleString()}`;
-  document.getElementById('streakEl').textContent=streak>=3?`🔥${streak}`:'';
-  const f=document.getElementById('scoreFlash'); f.textContent=`+${earned}`; f.classList.remove('pop'); void f.offsetWidth; f.classList.add('pop');
-  if(streak===5||streak===10||streak===20) triggerCelebration(streak);
-}
-function resetStreak(){ streak=0; document.getElementById('streakEl').textContent=''; }
+function handleBackdropClick(){ hideAllSheets(); }
 
 /* ── Stats / header ── */
 function updateHeader(){
@@ -740,38 +763,13 @@ function updateHeader(){
   document.getElementById('modeLabel').textContent=`${m.icon} ${m.th}`;
   document.body.dataset.mode=modeId;
 }
-async function refreshStats(){
-  try{
-    const {data}=await sb.rpc('field_stats',{p_field:modeObj().field});
-    if(data&&data[0]){ const {done,total}=data[0]; const pct=total?(done/total*100).toFixed(2):'0.00';
-      document.getElementById('progressFill').style.width=pct+'%';
-      document.getElementById('progressText').textContent=`${Number(done).toLocaleString()} / ${Number(total).toLocaleString()} (${pct}%)`;
-    }
-  }catch(_){}
-}
-
-/* ── Persistence ── */
-function saveVerification(w, vote, correction){
-  const m=modeObj();
-  const rec={ word:w.word, field:m.field, vote, current_val:getVal(w), correction, nickname, device_id:deviceId };
-  sendVerification(rec);
-  addScore(vote==='wrong'?'correction':'confirm');
-  if(++sinceStatRefresh>=10){ sinceStatRefresh=0; refreshStats(); }
-}
-async function sendVerification(rec){
-  try{ const {error}=await sb.from('verifications').insert(rec); if(error) throw error; }
-  catch(e){ console.warn('insert failed, queued', e); pendingInserts.push(rec); localStorage.setItem('roi_pending', JSON.stringify(pendingInserts)); }
-}
-async function flushPending(){
-  if(!pendingInserts.length) return;
-  const batch=pendingInserts.splice(0); localStorage.setItem('roi_pending','[]');
-  try{ const {error}=await sb.from('verifications').insert(batch); if(error) throw error; toast(`ส่งคะแนนที่ค้างไว้ ${batch.length} รายการแล้ว`); }
-  catch(e){ pendingInserts.unshift(...batch); localStorage.setItem('roi_pending', JSON.stringify(pendingInserts)); }
+function refreshStats(){
+  document.getElementById('progressFill').style.width='0%';
+  document.getElementById('progressText').textContent=`เกม · ตอบแล้ว ${quizAnswered} ข้อ · สตรีคสูงสุด ${quizBest}`;
 }
 
 /* ── Keyboard ── */
 document.addEventListener('keydown', e=>{
-  if(document.getElementById('nickModal').classList.contains('visible')) return;
   if(openSheet){ if(e.key==='Escape') dismissSheet(); return; }
   if(e.key==='ArrowRight')doSwipe('right'); else if(e.key==='ArrowLeft')doSwipe('left'); else if(e.key==='ArrowUp')doSwipe('up');
 });

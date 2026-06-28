@@ -1,126 +1,156 @@
-# Roi-Kham Word Verification — Webapp
+# Roi-Kham — Thai Word Quiz (Webapp)
 
-A shareable web game. Send anyone the link, they pick a verification mode and
-swipe through Thai words. Every vote flows into one shared Supabase database.
+A shareable, **anonymous** swipe quiz for Thai words. Send anyone the link — they
+play instantly (no nickname, no signup). Words are served from a shared Supabase
+database; an admin can grow that word list from a web form + a small script.
 
 ```
 Browser (index.html)            Supabase (free tier)
-  swipe → insert vote   ───────►  verifications  table
-  get_words / stats     ◄───────  words (62k) + RPC functions
+  quiz_words  ◄──────────────────  words (62k)
+                                   pending_words (admin queue)
+admin.html → queue_word_change ─►  pending_words
+add_words.py  ─ service role ───►  words   (add / edit / delete)
 ```
 
 - **No backend server to run.** The browser talks to Supabase directly.
-- **Least-voted-first:** the server hands out the words that need votes most.
-- **Nickname, no signup:** players type a name once → leaderboard.
-- A word stops appearing once it has **3 votes** (`VOTES_NEEDED`).
+- **Anonymous:** the game starts immediately; scores (⭐ + 🔥 streak) are per-session only — no leaderboard, nothing stored.
+- **Plays offline too:** if Supabase is unreachable it falls back to the bundled `words.js`.
 
----
+## How to play
 
-## One-time setup (~15 min)
-
-### 1. Create a Supabase project
-- Go to https://supabase.com → New project (free).
-- Wait for it to finish provisioning.
-
-### 2. Create the database
-- Dashboard → **SQL Editor** → New query.
-- Paste the entire contents of [`schema.sql`](schema.sql) → **Run**.
-- This creates the `words` + `verifications` tables, security rules, and the
-  `get_words`, `field_stats`, `leaderboard` functions.
-
-### 3. Get your keys
-- Dashboard → **Project Settings → API**. You need three values:
-  | Value | Used by | Secret? |
-  |-------|---------|---------|
-  | Project URL | both | no |
-  | `anon` public key | `index.html` | no (safe in browser) |
-  | `service_role` key | `import_words.py` | **YES — keep private** |
-
-### 4. Load the 62k words
-From this `webapp/` folder, in **PowerShell**:
-```powershell
-$env:SUPABASE_URL = "https://YOURPROJECT.supabase.co"
-$env:SUPABASE_SERVICE_KEY = "eyJhbGci...service_role..."
-python import_words.py
-```
-It reads `../prototype/words.js` and uploads in batches (~1 min). Re-running is
-safe (it upserts).
-
-### 5. Connect the game
-- Open [`index.html`](index.html), find the **CONFIG** block near the top of the
-  `<script>`, and paste your **Project URL** and **anon** key:
-  ```js
-  const SUPABASE_URL      = 'https://YOURPROJECT.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGci...anon...';
-  ```
-- Open `index.html` in a browser to test locally. Type a nickname, swipe a few
-  words, then check **Supabase → Table editor → verifications** — your votes
-  should appear.
-
----
-
-## Publish the link (pick one, all free)
-
-`index.html` is a single static file, so any static host works.
-
-**Netlify Drop (easiest):**
-1. Go to https://app.netlify.com/drop
-2. Drag the `webapp` folder onto the page.
-3. You get a public URL like `https://roi-kham-xxx.netlify.app` — share it.
-
-**Vercel:** `npm i -g vercel` → run `vercel` inside `webapp/`.
-
-**GitHub Pages:** push `webapp/` to a repo → Settings → Pages → deploy from branch.
-
-> Re-deploy whenever you change `index.html`. The Supabase URL/key are baked into
-> the file, so anyone who opens the link plays against your shared database.
-
----
-
-## How play works
+The card shows a Thai word and a claim; you answer by swiping:
 
 | Swipe | Meaning | Score |
 |-------|---------|-------|
-| → right | the shown answer is **correct** | +10 |
-| ← left  | **wrong** → pick the correct answer | +20 |
-| ↑ up    | skip (no vote recorded) | — |
+| → right | the claim is **true** (ถูก) | +streak (1st +1, 2nd in a row +2, 3rd +3 …) |
+| ← left  | the claim is **false** (ผิด) | −1, streak resets |
+| ↑ up    | skip (ข้าม) | 0; every 3rd skip −1 |
 
-5 verification modes (tap the mode button in the header):
-📝 ชนิดคำ · 🔤 มาตราตัวสะกด · 🔊 เสียงคำ · 🎯 อักษร 3 หมู่ · 🏷️ หมวดหมู่คำ (multi-select).
+Three modes (tap the mode button): 🎮 **เกมทายชนิดคำ** (POS) · 🎮 **เกมทายมาตรา**
+(final class) · 🎮 **เกมทายคำสะกด** (spelling — wrong spellings are generated on the
+fly by swapping same-sound Thai consonants, verified against `words.js`).
 
 ---
 
-## Reading the results
+## One-time setup
 
-In the Supabase SQL editor:
+### 1. Supabase project + tables
+- https://supabase.com → New project (free).
+- SQL Editor → run [`schema.sql`](schema.sql) (creates the `words` table).
+- SQL Editor → run [`quiz_schema.sql`](quiz_schema.sql) (adds `quiz_words` and the
+  `pending_words` admin queue).
 
-```sql
--- Words the crowd disagrees with the database on (POS example)
-select word, current_val, correction, count(*) votes
-from verifications
-where field = 'pos' and vote = 'wrong'
-group by word, current_val, correction
-order by votes desc;
+### 2. Keys
+Dashboard → **Project Settings → API**:
 
--- Consensus per word: how many said correct vs wrong
-select word, field,
-       count(*) filter (where vote='correct') as ok,
-       count(*) filter (where vote='wrong')   as bad
-from verifications
-group by word, field
-having count(*) >= 3
-order by bad desc;
+| Value | Used by | Secret? |
+|-------|---------|---------|
+| Project URL | `index.html`, `admin.html`, `add_words.py` | no |
+| `anon` public key | `index.html`, `admin.html` | no (safe in browser) |
+| `service_role` key | `add_words.py` only | **YES — keep private** |
+
+### 3. Load the 62k words (one time)
+```powershell
+$env:SUPABASE_URL = "https://YOURPROJECT.supabase.co"
+$env:SUPABASE_SERVICE_KEY = "eyJ...service_role..."
+python add_words.py --import          # reads words.js, uploads to Supabase
 ```
 
-You can later feed these corrections back into `Handoff/words.db` — the column
-layout mirrors the old `import_verifications.py` (pos / final / livedead / lead /
-cats), so a similar importer can pull from Supabase instead of a JSON file.
+### 4. Connect the apps
+Paste your **Project URL** + **anon key** into the CONFIG block near the top of the
+`<script>` in **both** `index.html` and `admin.html`.
+
+---
+
+## Growing the word list (admin)
+
+Two ways to add words — both end up in the `words` table via `add_words.py`
+(which computes Thai properties with PyThaiNLP). **All writes to `words` happen in
+this script (service-role); the browser only enqueues requests.**
+
+```powershell
+pip install pythainlp python-crfsuite requests beautifulsoup4 lxml pdfplumber python-docx
+# pythainlp+crfsuite: tokenize/POS/syllables · requests+bs4+lxml: URL/HTML
+# pdfplumber: PDF · python-docx: Word (PDF/Word libs load only when used)
+```
+
+**A. Web form (share this with a helper):** `admin.html` is one self-contained
+file with **no password** — give it to anyone you trust and they can **Add / Edit
+/ Delete** words. Each action is queued into `pending_words` (it does NOT touch
+`words` directly). In the **คิว (queue) tab** you can curate before applying: set a
+category on a row or 🗑️ remove junk. Then **you** apply the queue:
+```powershell
+$env:SUPABASE_URL = "https://YOURPROJECT.supabase.co"
+$env:SUPABASE_SERVICE_KEY = "eyJ...service_role..."
+python add_words.py --process
+```
+
+**B. Direct bulk (script):**
+```powershell
+python add_words.py --word แมว
+python add_words.py --file new_words.txt      # one Thai word per line
+```
+
+**C. Harvest from a document or web page:** point the scraper at a URL or a
+file; it extracts plain text, tokenizes Thai words, drops any already in the DB
+(or already queued), and queues the rest for review (option A):
+```powershell
+python add_words.py --scrape https://th.wikipedia.org/wiki/แมว
+python add_words.py --scrape article.pdf      # also .txt / .html / .docx
+```
+
+- **add** → auto-computes `syllables / pos / final_class / live_dead / leading_class` and upserts.
+- **edit** → applies only the fields you change.
+- **delete** → removes the row.
+
+Newly added words appear in the game automatically (the quiz pulls from Supabase).
+
+### ทายมาตรา uses a syllable table
+มาตราตัวสะกด is a per-syllable property, so the ทายมาตรา mode quizzes single
+**syllables** (ประจำวัน → ประ / จำ / วัน), drawn from a `syllables` table. Build /
+refresh it after adding words:
+```powershell
+python add_words.py --build-split
+```
+(New words also add their own syllables automatically when applied.) Offline, the
+mode falls back to whole single-syllable words from `words.js`.
+
+> Note: the bundled `words.js` (spelling-check dictionary + offline fallback) is
+> NOT updated by `add_words.py`. Freshly added words can rarely cause a false
+> result in the spelling mode until `words.js` is regenerated.
+
+---
+
+## Publish the link (all free)
+
+`index.html` is a single static file (plus `words.js`). Drag the folder onto
+https://app.netlify.com/drop, or use Vercel / GitHub Pages. The Supabase URL/key
+are baked into the file, so anyone who opens the link plays against your database.
+
+`admin.html` has no password (it can only queue word requests, never write to
+`words`), so it's safe to send to a trusted helper who adds words for you — you
+apply them later with `python add_words.py --process`.
 
 ---
 
 ## Tuning
+- **Words per fetch:** `BUFFER_SIZE` / `REFILL_AT` in `index.html`.
+- **Quiz scoring:** `doQuizSwipe()` in `index.html`.
+- **Sound effects:** `playSfx()` in `index.html`.
 
-- **Votes needed per word:** change `< 3` in `get_words` *and* `>= 3` in
-  `field_stats` (schema.sql), plus `VOTES_NEEDED` in `index.html`.
-- **Buffer size / refill point:** `BUFFER_SIZE` / `REFILL_AT` in `index.html`.
-- **Scoring:** `addScore()` in `index.html` and the `leaderboard` function.
+## Files
+- `index.html` — the game (share publicly).
+- `admin.html` — word add/edit/delete form, no password (share with helpers).
+- `add_words.py` — the only script: `--scrape` (URL/doc → queue new words),
+  `--process` (apply the queue), `--word` / `--file` (direct add), `--import`
+  (bulk load words.js), `--build-split` (build the `syllables` table). Needs the
+  service-role key.
+- `quiz_schema.sql` — `quiz_words` + `quiz_syllables` + `pending_words` queue + `syllables`.
+- `schema.sql` — creates the `words` table.
+- `words.js` — bundled word data (offline fallback + spelling dictionary).
+
+## Legacy
+The earlier crowd-**verification** game (the `verifications` table and its RPCs in
+`schema.sql`) is no longer used. Those objects are harmless if left in place; the
+verification UI and its Python scripts have been removed in favor of
+admin-controlled word editing.
